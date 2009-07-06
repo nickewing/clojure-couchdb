@@ -2,7 +2,7 @@
   (:import (java.io FileInputStream))
   (:require (couchdb [client :as couchdb])
             (clojure.contrib [error-kit :as kit]))
-  (:use (clojure.contrib test-is)
+  (:use (clojure test)
         [clojure.contrib.duck-streams :only [reader]]))
 
 
