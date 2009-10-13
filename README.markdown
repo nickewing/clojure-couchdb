@@ -37,11 +37,11 @@ Depends on clojure-contrib and [clojure-http-client](http://github.com/technoman
 ###document-create
     user=> (document-create "some-db" {:foo 42})
     {:foo 42, :_id "5bc3673322f38a4998aca23976acd4c6", :_rev "1-1799037045"}
-    user=> (document-create "some-db" {:foo 42} "my-doc")
+    user=> (document-create "some-db"  "my-doc" {:foo 42})
     {:foo 42, :_id "my-doc", :_rev "1-2310851567"}
 ###document-update
     user=> (let [doc (document-get "some-db" "my-doc")]
-             (document-update "some-db" (assoc doc :bam true) "my-doc"))
+             (document-update "some-db" "my-doc" (assoc doc :bam true)))
     {:foo 42, :bam true, :_id "my-doc", :_rev "2-1148768398"}
 ###document-revisions
     user=> (document-revisions "some-db" "my-doc")
