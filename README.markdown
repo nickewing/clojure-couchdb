@@ -64,3 +64,54 @@ Depends on clojure-contrib and [clojure-http-client](http://github.com/technoman
 ###attachment-delete
     user=> (attachment-delete "some-db" "my-doc" "new-attachment")
     true
+
+##View Functions
+
+For now, views should be created/edited outside of this API.
+
+In the following examples consider a simple view:
+
+   `"foobars": {
+       "map": "function(doc) {  emit(doc.foobar, doc); }"
+   }`
+
+###view-get
+    user=> ; create some docs
+    user=> (document-create "some-db" "doc1" {:foobar 42})
+    {:_rev "1-4227851621", :_id "doc1", :foobar 42}
+    user=> (document-create "some-db" "doc2" {:foobar 23})
+    {:_rev "1-1185099016", :_id "doc2", :foobar 23}
+    user=> ; run views
+    user=> (pprint (view-get "some-db" "my-design-doc" "foobars"))
+    {:rows
+     [{:value {:foobar 23, :_rev "1-1185099016", :_id "doc2"},
+       :key 23,
+       :id "doc2"}
+      {:value {:foobar 42, :_rev "1-4227851621", :_id "doc1"},
+       :key 42,
+       :id "doc1"}],
+     :offset 0,
+     :total_rows 2}
+    nil
+    user=> (pprint (view-get "some-db" "my-design-doc" "foobars" {:descending true}))
+    {:rows
+     [{:value {:foobar 42, :_rev "1-4227851621", :_id "doc1"},
+       :key 42,
+       :id "doc1"}
+      {:value {:foobar 23, :_rev "1-1185099016", :_id "doc2"},
+       :key 23,
+       :id "doc2"}],
+     :offset 0,
+     :total_rows 2}
+    nil
+    user=> (pprint (view-get "some-db" "my-design-doc" "foobars" {:startkey 40}))
+    {:rows
+     [{:value {:foobar 42, :_rev "1-4227851621", :_id "doc1"},
+       :key 42,
+       :id "doc1"}],
+     :offset 1,
+     :total_rows 2}
+    nil
+
+Nested clojure terms are also allowed in view options (eg. as keys) -- they will be converted to json and then to proper url-encoded GET args.
+
