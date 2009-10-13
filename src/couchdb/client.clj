@@ -208,10 +208,10 @@
 
 (def #^{:private true} vals2json (partial vals-lift json-str))
 
-(defn view-get [db design-doc view-name & [query-args]]
+(defn view-get [db design-doc view-name & [view-options]]
   (:json (couch-request 
    (str *server* db "/_design/" design-doc "/_view/" view-name "?"
-	(url-encode (vals2json query-args))))))
+	(url-encode (vals2json view-options))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
