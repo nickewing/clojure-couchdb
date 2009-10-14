@@ -213,6 +213,14 @@
    (str *server* db "/_design/" design-doc "/_view/" view-name "?"
 	(url-encode (vals2json view-options))))))
 
+(defn view-temp-get [db view-map & [view-options]]
+  (:json (couch-request 
+		  (str *server* db "/_temp_view?"
+			   (url-encode (vals2json view-options)))
+		  :post
+		  {"Content-Type" "application/json"}
+		   {}
+		   (json-str view-map))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;        Attachments          ;;
