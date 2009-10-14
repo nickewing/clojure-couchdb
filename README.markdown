@@ -116,3 +116,7 @@ In the following examples consider a simple view:
 
 Nested clojure terms are also allowed in view options (eg. as keys) -- they will be converted to json and then to proper url-encoded GET args.
 
+###view-temp-get 
+
+    user=> ; The following will produce the same output as the example above
+    user=> (pprint (view-temp-get "some-db" {:map "function(doc) { emit(doc.foobar, doc); }" }))
