@@ -82,6 +82,7 @@ In the following examples consider a simple view:
     user=> (document-create "some-db" "doc2" {:foobar 23})
     {:_rev "1-1185099016", :_id "doc2", :foobar 23}
     user=> ; run views
+	user=> (use clojure.contrib.pprint) ; for pprint
     user=> (pprint (view-get "some-db" "my-design-doc" "foobars"))
     {:rows
      [{:value {:foobar 23, :_rev "1-1185099016", :_id "doc2"},
