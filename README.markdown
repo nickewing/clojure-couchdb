@@ -71,9 +71,9 @@ For now, views should be created/edited outside of this API.
 
 In the following examples consider a simple view:
 
-   "foobars": {
-       "map": "function(doc) {  emit(doc.foobar, doc); }"
-   }
+    "foobars": {
+        "map": "function(doc) {  emit(doc.foobar, doc); }"
+    }
 
 ###view-get
     user=> ; create some docs
