@@ -190,8 +190,9 @@
     false))
 
 
-(defn document-bulk-update [database document-coll & [request-options]]
+(defn document-bulk-update
   "Does a bulk-update to couchdb, accoding to: http://wiki.apache.org/couchdb/HTTP_Bulk_Document_API"
+  [database document-coll & [request-options]]
   (when-let [database (validate-dbname database)]
     (let [response (:json
                     (couch-request
