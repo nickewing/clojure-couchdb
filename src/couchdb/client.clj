@@ -180,12 +180,14 @@
 
 (defn document-delete
   [database id]
-  (when-let [database (validate-dbname database)]
-    (let [id (do-get-doc database id)
-          rev (do-get-rev database id)]
-      (couch-request (str *server* database "/" (url-encode (as-str id)) "?rev=" rev)
-                     :delete)
-      true)))
+  (if-not (empty? id)
+    (when-let [database (validate-dbname database)]
+      (let [id (do-get-doc database id)
+            rev (do-get-rev database id)]
+        (couch-request (str *server* database "/" (url-encode (as-str id)) "?rev=" rev)
+                       :delete)
+        true))
+    false))
 
 
 (defn document-bulk-update [database document-coll & [request-options]]
