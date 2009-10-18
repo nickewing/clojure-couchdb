@@ -50,7 +50,7 @@ Depends on clojure-contrib and [clojure-http-client](http://github.com/technoman
     user=> (document-delete "some-db" "my-doc")
     true
 ###document-bulk-update
-    user=> (document-bulk-update "some-db" [{:id "someornoid1" :foo 42 :name "test"} {:_id "someid2" :foo 0 :name "me"}])
+    user=> (document-bulk-update "some-db" [{:_id "someornoid1" :foo 42 :name "test"} {:_id "someid2" :foo 0 :name "me"}])
     user=> ({:_rev "1-949ae2b415db193b3a273f5205be8182", :_id "someornoid1", :foo 42, :name "test"} {:_rev "1-77d4ba9888f0490bf9656a5a91a374ff", :_id "someid2", :foo 0, :name "me"})
 
 ##Attachment Functions
