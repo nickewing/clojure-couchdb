@@ -187,6 +187,26 @@
                      :delete)
       true)))
 
+
+(defn document-bulk-update [database document-coll & [request-options]]
+  "Does a bulk-update to couchdb, accoding to: http://wiki.apache.org/couchdb/HTTP_Bulk_Document_API"
+  (when-let [database (validate-dbname database)]
+    (let [response (:json
+                    (couch-request
+                     (str *server* database "/_bulk_docs"
+                          (url-encode (vals2json request-options)))
+                     :post
+                     {"Content-Type" "application/json"}
+                     {}
+                     (json-str {:docs document-coll})))]
+      ;; I don't know if this is correct... I assume that the server sends the
+      ;; ids and revs in the same order as ib my request back.
+      (map (fn [respdoc, orgdoc]
+             (merge orgdoc
+                    {:_id (:id respdoc)
+                     :_rev (:rev respdoc)}))
+           response document-coll))))
+
 (defn- revision-comparator
   [x y]
   (> (Integer/decode (apply str (take-while #(not= % \-) x)))
@@ -199,7 +219,6 @@
       (apply merge (map (fn [m]
                           (sorted-map-by revision-comparator (:rev m) (:status m)))
                         (:_revs_info (:json (couch-request (str *server* database "/" (url-encode (as-str id)) "?revs_info=true")))))))))
-
 
 ;; Views
 
