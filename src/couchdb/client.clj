@@ -83,6 +83,11 @@
     [k v]))
 
 
+(defn- vals-lift [f m]
+  (reduce (fn [acc [k v]] (assoc acc k (f v))) {} (seq m)))
+
+(def #^{:private true} vals2json (partial vals-lift json-str))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;          Databases          ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -224,11 +229,6 @@
                         (:_revs_info (:json (couch-request (str *server* database "/" (url-encode (as-str id)) "?revs_info=true")))))))))
 
 ;; Views
-
-(defn- vals-lift [f m]
-  (reduce (fn [acc [k v]] (assoc acc k (f v))) {} (seq m)))
-
-(def #^{:private true} vals2json (partial vals-lift json-str))
 
 (defn view-get [db design-doc view-name & [view-options]]
   (:json (couch-request 
