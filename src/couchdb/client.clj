@@ -282,3 +282,13 @@
       (couch-request (str *server* database "/" (url-encode (as-str document)) "/" (url-encode (as-str id)) "?rev=" rev)
                      :delete)
       true)))
+
+;; Shows
+
+(defn show-get
+  "Returns the contents of a show as a string according to http://wiki.apache.org/couchdb/Formatting_with_Show_and_List"
+  [database design-doc show-name id & [show-options]]
+  (:body-seq
+   (couch-request 
+    (str *server* database "/_design/" design-doc "/_show/" show-name "/" id
+         "?" (url-encode (vals2json show-options))))))
