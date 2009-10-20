@@ -123,3 +123,20 @@ Nested clojure terms are also allowed in view options (eg. as keys) -- they will
 
     user=> ; The following will produce the same output as the example above
     user=> (pprint (view-temp-get "some-db" {:map "function(doc) { emit(doc.foobar, doc); }" }))
+
+##Show Functions
+
+###show-get
+Returns the string-representation of a show from CouchDB
+
+Consider a show named forty-two in the design-document test:
+    
+    function(doc,req) { 
+      return { 
+               body: \"<div>42</div>\" 
+             }; 
+    }
+
+    user=> ; The latest field is the id. It's left blank in this example
+    user=> (show-get "some-db" "test" "forty-two" "")
+    user=> ("<div>42</div>")
