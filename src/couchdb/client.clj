@@ -286,7 +286,7 @@
 ;; Shows
 
 (defn show-get
-  "Returns the contents of a show as a string according to http://wiki.apache.org/couchdb/Formatting_with_Show_and_List"
+  "Returns the contents of a show as a list of strings according to http://wiki.apache.org/couchdb/Formatting_with_Show_and_List"
   [database design-doc show-name id & [show-options]]
   (:body-seq
    (couch-request 
