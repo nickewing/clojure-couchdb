@@ -5,9 +5,6 @@
         [clojure.contrib.json.write :only [json-str]]
         [clojure.http.client :only [request url-encode]]))
 
-(def *server* "http://localhost:5984/")
-
-
 (kit/deferror InvalidDatabaseName [] [database]
   {:msg (str "Invalid Database Name: " database)
    :unhandled (kit/throw-msg Exception)})
@@ -91,31 +88,31 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;          Databases          ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defn database-list
-  []
-  (:json (couch-request (str *server* "_all_dbs"))))
+(defn database-list 
+  [server]
+  (:json (couch-request (str server "_all_dbs"))))
 
 (defn database-create
-  [database]
+  [server database]
   (when-let [database (validate-dbname database)]
-    (couch-request (str *server* database) :put)
+    (couch-request (str server database) :put)
     database))
 
 (defn database-delete
-  [database]
+  [server database]
   (when-let [database (validate-dbname database)]
-    (couch-request (str *server* database) :delete)
+    (couch-request (str server database) :delete)
     true))
 
 (defn database-info
-  [database]
+  [server database]
   (when-let [database (validate-dbname database)]
-    (:json (couch-request (str *server* database)))))
+    (:json (couch-request (str server database)))))
 
 (defn database-compact
-  [database]
+  [server database]
   (when-let [database (validate-dbname database)]
-    (couch-request (str *server* database "/_compact") :post)
+    (couch-request (str server database "/_compact") :post)
     true))
 
 
@@ -133,17 +130,17 @@
     document))
 
 (defn- do-get-rev
-  [database document]
+  [server database document]
   (if (map? document)
     (if-let [rev (:_rev document)]
       rev
       (kit/raise ResourceConflict "missing :_rev key"))
-    (:_rev (document-get database document))))
+    (:_rev (document-get server database document))))
 
 (defn- do-document-touch
-  [database payload id method]
+  [server database payload id method]
   (when-let [database (validate-dbname database)]
-    (let [response (:json (couch-request (str *server* database (when id
+    (let [response (:json (couch-request (str server database (when id
                                                                   (str "/" (url-encode (as-str id)))))
                                          method
                                          {"Content-Type" "application/json"}
@@ -154,46 +151,46 @@
               :_rev (:rev response)}))))
 
 (defn document-list
-  ([database]
+  ([server database]
      (when-let [database (validate-dbname database)]
-       (map :id (:rows (:json (couch-request (str *server* database "/_all_docs")))))))
-  ([database options]
+       (map :id (:rows (:json (couch-request (str server database "/_all_docs")))))))
+  ([server database options]
      (when-let [database (validate-dbname database)] 
        (map (if (:include_docs options) :doc :id)
             (:rows (:json (couch-request
-                           (str *server* database "/_all_docs?"
+                           (str server database "/_all_docs?"
                                 (url-encode options)))))))))
        
 
 (defn document-create
-  ([database payload]
-     (do-document-touch database payload nil :post))
-  ([database id payload]
-     (do-document-touch database payload id :put)))
+  ([server database payload]
+     (do-document-touch server database payload nil :post))
+  ([server database id payload]
+     (do-document-touch server database payload id :put)))
 
 (defn document-update
-  [database id payload]
+  [server database id payload]
   ;(assert (:_rev payload)) ;; payload needs to have a revision or you'll get a PreconditionFailed error
   (let [id (do-get-doc database id)]
-    (do-document-touch database payload id :put)))
+    (do-document-touch server database payload id :put)))
 
 (defn document-get
-  ([database id]
+  ([server database id]
      (when-let [database (validate-dbname database)]
        (let [id (do-get-doc database id)]
-         (:json (couch-request (str *server* database "/" (url-encode (as-str id))))))))
-  ([database id rev]
+         (:json (couch-request (str server database "/" (url-encode (as-str id))))))))
+  ([server database id rev]
      (when-let [database (validate-dbname database)]
        (let [id (do-get-doc database id)]
-         (:json (couch-request (str *server* database "/" (url-encode (as-str id)) "?rev=" rev)))))))
+         (:json (couch-request (str server database "/" (url-encode (as-str id)) "?rev=" rev)))))))
 
 (defn document-delete
-  [database id]
+  [server database id]
   (if-not (empty? id)
     (when-let [database (validate-dbname database)]
       (let [id (do-get-doc database id)
-            rev (do-get-rev database id)]
-        (couch-request (str *server* database "/" (url-encode (as-str id)) "?rev=" rev)
+            rev (do-get-rev server database id)]
+        (couch-request (str server database "/" (url-encode (as-str id)) "?rev=" rev)
                        :delete)
         true))
     false))
@@ -201,11 +198,11 @@
 
 (defn document-bulk-update
   "Does a bulk-update to couchdb, accoding to: http://wiki.apache.org/couchdb/HTTP_Bulk_Document_API"
-  [database document-coll & [request-options]]
+  [server database document-coll & [request-options]]
   (when-let [database (validate-dbname database)]
     (let [response (:json
                     (couch-request
-                     (str *server* database "/_bulk_docs"
+                     (str server database "/_bulk_docs"
                           (url-encode (vals2json request-options)))
                      :post
                      {"Content-Type" "application/json"}
@@ -225,23 +222,23 @@
      (Integer/decode (apply str (take-while #(not= % \-) y)))))
 
 (defn document-revisions
-  [database id]
+  [server database id]
   (when-let [database (validate-dbname database)]
     (let [id (do-get-doc database id)]
       (apply merge (map (fn [m]
                           (sorted-map-by revision-comparator (:rev m) (:status m)))
-                        (:_revs_info (:json (couch-request (str *server* database "/" (url-encode (as-str id)) "?revs_info=true")))))))))
+                        (:_revs_info (:json (couch-request (str server database "/" (url-encode (as-str id)) "?revs_info=true")))))))))
 
 ;; Views
 
-(defn view-get [db design-doc view-name & [view-options]]
+(defn view-get [server db design-doc view-name & [view-options]]
   (:json (couch-request 
-   (str *server* db "/_design/" design-doc "/_view/" view-name "?"
+   (str server db "/_design/" design-doc "/_view/" view-name "?"
 	(url-encode (vals2json view-options))))))
 
-(defn view-temp-get [db view-map & [view-options]]
+(defn view-temp-get [server db view-map & [view-options]]
   (:json (couch-request 
-          (str *server* db "/_temp_view?"
+          (str server db "/_temp_view?"
                (url-encode (vals2json view-options)))
           :post
           {"Content-Type" "application/json"}
@@ -252,18 +249,18 @@
 ;;        Attachments          ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defn attachment-list
-  [database document]
+  [server database document]
   (let [document (do-get-doc database document)]
     (into {} (map stringify-top-level-keys
-                  (:_attachments (document-get database document))))))
+                  (:_attachments (document-get server database document))))))
 
 
 (defn attachment-create
-  [database document id payload content-type]
+  [server database document id payload content-type]
   (when-let [database (validate-dbname database)]
     (let [document (do-get-doc database document)
-          rev (do-get-rev database document)]
-      (couch-request (str *server* database "/" (url-encode (as-str document)) "/" (url-encode (as-str id)) "?rev=" rev)
+          rev (do-get-rev server database document)]
+      (couch-request (str server database "/" (url-encode (as-str document)) "/" (url-encode (as-str id)) "?rev=" rev)
                      :put
                      {"Content-Type" content-type}
                      {}
@@ -271,19 +268,19 @@
     id))
 
 (defn attachment-get
-  [database document id]
+  [server database document id]
   (when-let [database (validate-dbname database)]
     (let [document (do-get-doc database document)
-          response (couch-request (str *server* database "/" (url-encode (as-str document)) "/" (url-encode (as-str id))))]
+          response (couch-request (str server database "/" (url-encode (as-str document)) "/" (url-encode (as-str id))))]
       {:body-seq (:body-seq response)
        :content-type ((:get-header response) "content-type")})))
 
 (defn attachment-delete
-  [database document id]
+  [server database document id]
   (when-let [database (validate-dbname database)]
     (let [document (do-get-doc database document)
-          rev (do-get-rev database document)]
-      (couch-request (str *server* database "/" (url-encode (as-str document)) "/" (url-encode (as-str id)) "?rev=" rev)
+          rev (do-get-rev server database document)]
+      (couch-request (str server database "/" (url-encode (as-str document)) "/" (url-encode (as-str id)) "?rev=" rev)
                      :delete)
       true)))
 
@@ -291,8 +288,8 @@
 
 (defn show-get
   "Returns the contents of a show as a list of strings according to http://wiki.apache.org/couchdb/Formatting_with_Show_and_List"
-  [database design-doc show-name id & [show-options]]
+  [server database design-doc show-name id & [show-options]]
   (:body-seq
    (couch-request 
-    (str *server* database "/_design/" design-doc "/_show/" show-name "/" id
+    (str server database "/_design/" design-doc "/_show/" show-name "/" id
          "?" (url-encode (vals2json show-options))))))
