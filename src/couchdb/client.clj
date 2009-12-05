@@ -154,12 +154,12 @@
   ([server database]
      (when-let [database (validate-dbname database)]
        (map :id (:rows (:json (couch-request (str server database "/_all_docs")))))))
-  ([server database options]
+  ([server database & [options]]
      (when-let [database (validate-dbname database)] 
        (map (if (:include_docs options) :doc :id)
             (:rows (:json (couch-request
                            (str server database "/_all_docs?"
-                                (url-encode options)))))))))
+                                (url-encode (vals2json options))))))))))
        
 
 (defn document-create
