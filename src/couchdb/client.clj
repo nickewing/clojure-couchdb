@@ -62,6 +62,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;         Utilities           ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defn valid-dbname?
   [database]
   (boolean (re-find #"^[a-z][a-z0-9_$()+-/]*$" database)))
@@ -88,7 +89,6 @@
     (str url \/ )
     url))
 
-
 (defn- vals-lift [f m]
   (reduce (fn [acc [k v]] (assoc acc k (f v))) {} (seq m)))
 
@@ -97,37 +97,38 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;          Databases          ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defn database-list 
+
+(defn #^{:rebind true} database-list 
   [server]
   (:json (couch-request (str (normalize-url server) "_all_dbs"))))
 
-(defn database-create
+(defn #^{:rebind true} database-create
   [server database]
   (when-let [database (validate-dbname database)]
     (couch-request (str (normalize-url server) database) :put)
     database))
 
-(defn database-delete
+(defn #^{:rebind true} database-delete
   [server database]
   (when-let [database (validate-dbname database)]
     (couch-request (str (normalize-url server) database) :delete)
     true))
 
-(defn database-info
+(defn #^{:rebind true} database-info
   [server database]
   (when-let [database (validate-dbname database)]
     (:json (couch-request (str (normalize-url server) database)))))
 
-(defn database-compact
+(defn #^{:rebind true} database-compact
   [server database]
   (when-let [database (validate-dbname database)]
     (couch-request (str (normalize-url server) database "/_compact") :post)
     true))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;         Documents           ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (declare document-get)
 
 (defn- do-get-doc
@@ -162,7 +163,7 @@
              {:_id (:id response)
               :_rev (:rev response)}))))
 
-(defn document-list
+(defn #^{:rebind true} document-list
   ([server database]
      (when-let [database (validate-dbname database)]
        (map :id (:rows (:json (couch-request (str (normalize-url server)
@@ -173,22 +174,21 @@
        (map (if (:include_docs options) :doc :id)
             (:rows (:json (couch-request
                            (str (normalize-url server) database "/_all_docs?"
-                                (url-encode (vals2json options))))))))))
-       
+                                (url-encode (vals2json options))))))))))       
 
-(defn document-create
+(defn #^{:rebind true} document-create
   ([server database payload]
      (do-document-touch (normalize-url server) database payload nil :post))
   ([server database id payload]
      (do-document-touch (normalize-url server) database payload id :put)))
 
-(defn document-update
+(defn #^{:rebind true} document-update
   [server database id payload]
   ;(assert (:_rev payload)) ;; payload needs to have a revision or you'll get a PreconditionFailed error
   (let [id (do-get-doc database id)]
     (do-document-touch (normalize-url server) database payload id :put)))
 
-(defn document-get
+(defn #^{:rebind true} document-get
   ([server database id]
      (when-let [database (validate-dbname database)]
        (let [id (do-get-doc database id)]
@@ -200,7 +200,7 @@
          (:json (couch-request (str (normalize-url server) database "/"
                                     (url-encode (as-str id)) "?rev=" rev)))))))
 
-(defn document-delete
+(defn #^{:rebind true} document-delete
   [server database id]
   (if-not (empty? id)
     (when-let [database (validate-dbname database)]
@@ -212,8 +212,7 @@
         true))
     false))
 
-
-(defn document-bulk-update
+(defn #^{:rebind true} document-bulk-update
   "Does a bulk-update to couchdb, accoding to
 http://wiki.apache.org/couchdb/HTTP_Bulk_Document_API"
   [server database document-coll & [request-options]]
@@ -239,7 +238,7 @@ http://wiki.apache.org/couchdb/HTTP_Bulk_Document_API"
   (> (Integer/decode (apply str (take-while #(not= % \-) x)))
      (Integer/decode (apply str (take-while #(not= % \-) y)))))
 
-(defn document-revisions
+(defn #^{:rebind true} document-revisions
   [server database id]
   (when-let [database (validate-dbname database)]
     (let [id (do-get-doc database id)]
@@ -247,14 +246,17 @@ http://wiki.apache.org/couchdb/HTTP_Bulk_Document_API"
                           (sorted-map-by revision-comparator (:rev m) (:status m)))
                         (:_revs_info (:json (couch-request (str (normalize-url server) database "/" (url-encode (as-str id)) "?revs_info=true")))))))))
 
-;; Views
 
-(defn view-get [server db design-doc view-name & [view-options]]
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;            Views            ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn #^{:rebind true} view-get [server db design-doc view-name & [view-options]]
   (:json (couch-request 
    (str (normalize-url server) db "/_design/" design-doc "/_view/" view-name "?"
 	(url-encode (vals2json view-options))))))
 
-(defn view-temp-get [server db view-map & [view-options]]
+(defn #^{:rebind true} view-temp-get [server db view-map & [view-options]]
   (:json (couch-request 
           (str (normalize-url server) db "/_temp_view?"
                (url-encode (vals2json view-options)))
@@ -266,15 +268,15 @@ http://wiki.apache.org/couchdb/HTTP_Bulk_Document_API"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;        Attachments          ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defn attachment-list
+
+(defn #^{:rebind true} attachment-list
   [server database document]
   (let [document (do-get-doc database document)]
     (into {} (map stringify-top-level-keys
                   (:_attachments (document-get (normalize-url server)
                                                database document))))))
 
-
-(defn attachment-create
+(defn #^{:rebind true} attachment-create
   [server database document id payload content-type]
   (when-let [database (validate-dbname database)]
     (let [document (do-get-doc database document)
@@ -288,7 +290,7 @@ http://wiki.apache.org/couchdb/HTTP_Bulk_Document_API"
                      payload))
     id))
 
-(defn attachment-get
+(defn #^{:rebind true} attachment-get
   [server database document id]
   (when-let [database (validate-dbname database)]
     (let [document (do-get-doc database document)
@@ -298,7 +300,7 @@ http://wiki.apache.org/couchdb/HTTP_Bulk_Document_API"
       {:body-seq (:body-seq response)
        :content-type ((:get-header response) "content-type")})))
 
-(defn attachment-delete
+(defn #^{:rebind true} attachment-delete
   [server database document id]
   (when-let [database (validate-dbname database)]
     (let [document (do-get-doc database document)
@@ -309,9 +311,11 @@ http://wiki.apache.org/couchdb/HTTP_Bulk_Document_API"
                      :delete)
       true)))
 
-;; Shows
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;            Shows            ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn show-get
+(defn #^{:rebind true} show-get
   "Returns the contents of a show as a list of strings according to
  http://wiki.apache.org/couchdb/Formatting_with_Show_and_List"
   [server database design-doc show-name id & [show-options]]
@@ -320,3 +324,35 @@ http://wiki.apache.org/couchdb/HTTP_Bulk_Document_API"
     (str (normalize-url server) database "/_design/"
          design-doc "/_show/" show-name "/"
          id "?" (url-encode (vals2json show-options))))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;       Utility Macros       ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn- vars-to-rebind []
+  (letfn [(rebind? [var]
+                   (let [m (meta var)]
+                    (and (= (:ns m)
+                            (find-ns 'couchdb.client))
+                         (:rebind m))))]
+   (filter rebind? (vals (ns-map *ns*)))))
+
+(defmacro with-server
+  "with-server rebinds all couchdb functions which take a server argument with
+the first argument, so you can call the functions without the server argument.
+
+Example:
+(with-server \"http://localhost:5984\"
+  (database-list))"
+
+  [server & body]
+  (let [ssharp (gensym "server-")]      ;necessary because nested-`
+   `(let [~ssharp ~server]
+      (binding ~(vec (mapcat #(vector (-> % meta :name symbol)
+                                      `(partial (var-get ~%) ~ssharp))
+                             (vars-to-rebind)))
+        (do
+          ~@body)))))
+
+;; (with-server (apply str (concat "http://" "localhost" ":5984"))
+;;   (database-list))
+
