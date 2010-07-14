@@ -10,6 +10,7 @@
 (def +test-server+ "http://localhost:5984/")
 (def +test-db+ "clojure-couchdb-test-database")
 (def +test-db2+  "clojure-couchdb-test-database2")
+(def +test-db3+  "clojure-couchdb-test-database3")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;         Utilities           ;;
@@ -306,11 +307,48 @@
        (finally
 	(couchdb/database-delete +test-server+ db))))
 
+(def test-db2-fixture (partial test-db-fixture +test-db2+))
+(def test-db3-fixture (partial test-db-fixture +test-db3+))
+
 (deftest replication-test
   (couchdb/database-replicate +test-server+ +test-db+
 		      +test-server+  +test-db2+)
   (is (= (couchdb/document-list +test-server+ +test-db+)
 	 (couchdb/document-list +test-server+  +test-db2+))))
+
+(deftest single-conflict-test
+  (let [doc1 (couchdb/document-create +test-server+ +test-db+ "conflict1" {:foo 1})
+	doc2 (couchdb/document-create +test-server+ +test-db2+ "conflict1" {:bar 1})] 
+
+    (couchdb/database-replicate +test-server+ +test-db+	+test-server+ +test-db2+)
+    (let [conflicts (couchdb/document-get-conflicts +test-server+ +test-db2+ "conflict1")]
+      (is (= 1 (count conflicts)))
+      (is (= (:_rev doc2) (first conflicts))))))
+
+(deftest multiple-conflict-test
+  (let [doc1 (couchdb/document-create +test-server+ +test-db+ "conflict2" {:foo 1})
+	doc2 (couchdb/document-create +test-server+ +test-db2+ "conflict2" {:bar 1})
+	doc3 (couchdb/document-update +test-server+ +test-db3+ "conflict2" {:baz 1})]
+
+    (couchdb/database-replicate +test-server+ +test-db+	+test-server+ +test-db3+)
+    (couchdb/database-replicate +test-server+ +test-db2+ +test-server+ +test-db3+)
+
+    (let [conflicts
+	  (couchdb/document-get-conflicts +test-server+ +test-db3+ "conflict2")]
+      (is (= 2 (count conflicts)))
+      (is (= (:_rev doc3) (first conflicts)))
+      (is (= (:_rev doc2) (second conflicts))))))
+
+(deftest no-conflict-test
+  (couchdb/document-create +test-server+ +test-db+ "no-conflict1" {:foo 1})
+  (couchdb/document-create +test-server+ +test-db2+ "no-conflict2" {:fo 1})
+  (couchdb/database-replicate +test-server+ +test-db+	+test-server+ +test-db2+)
+  (let [conflicts1
+	  (couchdb/document-get-conflicts +test-server+ +test-db2+ "no-conflict1")
+	conflicts2
+	  (couchdb/document-get-conflicts +test-server+ +test-db2+ "no-conflict2")]
+      (is (zero? (count conflicts1)))
+      (is (zero? (count conflicts2)))))
 
 ;;; test-ns-hook is used to run tests in the specified order
 (defn test-ns-hook []
@@ -319,7 +357,10 @@
   (attachments)
   (documents-passing-map)
   (attachments-passing-map)
-  (test-db-fixture +test-db2+ replication-test)
+  (test-db2-fixture replication-test)
+  (test-db2-fixture single-conflict-test)
+  ((compose-fixtures test-db2-fixture test-db3-fixture) multiple-conflict-test)
+  (test-db2-fixture no-conflict-test)
   (cleanup)
   (error-checking)
   (cleanup))

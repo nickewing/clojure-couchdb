@@ -255,6 +255,21 @@ http://wiki.apache.org/couchdb/HTTP_Bulk_Document_API"
                           (sorted-map-by revision-comparator (:rev m) (:status m)))
                         (:_revs_info (:json (couch-request (str (normalize-url server) database "/" (url-encode (as-str id)) "?revs_info=true")))))))))
 
+(defn url-encode-str [x]
+  (-> x
+      as-str
+      url-encode))
+
+(defn #^{:rebind true} document-get-conflicts
+  ([server database id]
+     (when-let [database (validate-dbname database)]
+       (-> server
+	   normalize-url
+	   (str database "/"
+		(url-encode-str (do-get-doc database id)) "?conflicts=true")
+	   couch-request
+	   :json
+	   :_conflicts))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;            Views            ;;
