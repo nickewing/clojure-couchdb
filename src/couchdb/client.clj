@@ -125,6 +125,15 @@
     (couch-request (str (normalize-url server) database "/_compact") :post)
     true))
 
+(defn #^{:rebind true} database-replicate
+  [src-server src-database target-server target-database]
+  (couch-request
+   (str (normalize-url target-server) "_replicate") :post
+   {"Content-Type" "application/json"}
+   {}
+   (json-str {"source"  (str (normalize-url src-server) src-database)
+	      "target" target-database})))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;         Documents           ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -199,15 +208,6 @@
        (let [id (do-get-doc database id)]
          (:json (couch-request (str (normalize-url server) database "/"
                                     (url-encode (as-str id)) "?rev=" rev)))))))
-
-(defn #^{:rebind true} database-replicate
-  [src-server src-database target-server target-database]
-  (couch-request
-   (str (normalize-url target-server) "_replicate") :post
-   {"Content-Type" "application/json"}
-   {}
-   (json-str {"source"  (str (normalize-url src-server) src-database)
-	      "target" target-database})))
 
 (defn #^{:rebind true} document-delete
   [server database id]
