@@ -224,7 +224,7 @@
 	(when-let [database (validate-dbname database)]
 	  (let [id (do-get-doc database id)]
 	    (document-delete server database id
-			     (do-get-rev (normalize-url (normalize-url server))
+			     (do-get-rev (normalize-url server)
 					 database id))))
 	false)))
 
@@ -262,29 +262,34 @@ http://wiki.apache.org/couchdb/HTTP_Bulk_Document_API"
                           (sorted-map-by revision-comparator (:rev m) (:status m)))
                         (:_revs_info (:json (couch-request (str (normalize-url server) database "/" (url-encode (as-str id)) "?revs_info=true")))))))))
 
-(defn- url-encode-str [x]
-  (-> x
+(defn- url-encode-str [s]
+  (-> s
       as-str
       url-encode))
 
 (defn #^{:rebind true} document-get-conflicts
-  ([server database id]
-     (when-let [database (validate-dbname database)]
-       (-> server
-	   normalize-url
-	   (str database "/"
-		(url-encode-str (do-get-doc database id)) "?conflicts=true")
-	   couch-request
-	   :json
-	   :_conflicts))))
+  "Returns a list of document revisions that conflict with the doc id"
+  [server database id]
+  (when-let [database (validate-dbname database)]
+    (-> server
+	normalize-url
+	(str database "/"
+	     (url-encode-str (do-get-doc database id)) "?conflicts=true")
+	couch-request
+	:json
+	:_conflicts)))
 
 (defn #^{:rebind true} document-resolve-conflict
-  ([server database id conflict-rev resolve-fn]
-     (when-let [database (validate-dbname database)]
-       (let [merged-doc (resolve-fn (document-get server database id conflict-rev)
-				    (document-get server database id))]
-	 (document-update server database id merged-doc)
-	  (document-delete server database id conflict-rev)))))
+  "Function for resolving a conflicted document takes a server,
+   database, document id, conflict revision (see document-get-conflicts)
+   and a function that takes two args, the first conflicted doc, the second
+   the current doc"
+  [server database id conflict-rev resolve-fn]
+  (when-let [database (validate-dbname database)]
+    (let [merged-doc (resolve-fn (document-get server database id conflict-rev)
+				 (document-get server database id))]
+      (document-update server database id merged-doc)
+      (document-delete server database id conflict-rev))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;            Views            ;;
