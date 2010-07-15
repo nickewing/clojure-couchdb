@@ -210,16 +210,23 @@
                                     (url-encode (as-str id)) "?rev=" rev)))))))
 
 (defn #^{:rebind true} document-delete
-  [server database id]
-  (if-not (empty? id)
-    (when-let [database (validate-dbname database)]
-      (let [id (do-get-doc database id)
-            rev (do-get-rev (normalize-url (normalize-url server)) database id)]
-        (couch-request (str (normalize-url server) database "/"
-                            (url-encode (as-str id)) "?rev=" rev)
-                       :delete)
-        true))
-    false))
+  ([server database id rev]
+     (if-not (empty? id)
+	(when-let [database (validate-dbname database)]
+	  (let [id (do-get-doc database id)]
+	    (couch-request (str (normalize-url server) database "/"
+				(url-encode (as-str id)) "?rev=" rev)
+			   :delete)
+	    true))
+	false))
+  ([server database id]
+      (if-not (empty? id)
+	(when-let [database (validate-dbname database)]
+	  (let [id (do-get-doc database id)]
+	    (document-delete server database id
+			     (do-get-rev (normalize-url (normalize-url server))
+					 database id))))
+	false)))
 
 (defn #^{:rebind true} document-bulk-update
   "Does a bulk-update to couchdb, accoding to
@@ -255,7 +262,7 @@ http://wiki.apache.org/couchdb/HTTP_Bulk_Document_API"
                           (sorted-map-by revision-comparator (:rev m) (:status m)))
                         (:_revs_info (:json (couch-request (str (normalize-url server) database "/" (url-encode (as-str id)) "?revs_info=true")))))))))
 
-(defn url-encode-str [x]
+(defn- url-encode-str [x]
   (-> x
       as-str
       url-encode))
@@ -270,6 +277,14 @@ http://wiki.apache.org/couchdb/HTTP_Bulk_Document_API"
 	   couch-request
 	   :json
 	   :_conflicts))))
+
+(defn #^{:rebind true} document-resolve-conflict
+  ([server database id conflict-rev resolve-fn]
+     (when-let [database (validate-dbname database)]
+       (let [merged-doc (resolve-fn (document-get server database id conflict-rev)
+				    (document-get server database id))]
+	 (document-update server database id merged-doc)
+	  (document-delete server database id conflict-rev)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;            Views            ;;
