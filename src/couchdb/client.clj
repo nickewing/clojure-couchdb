@@ -125,6 +125,15 @@
     (couch-request (str (normalize-url server) database "/_compact") :post)
     true))
 
+(defn #^{:rebind true} database-replicate
+  [src-server src-database target-server target-database]
+  (couch-request
+   (str (normalize-url target-server) "_replicate") :post
+   {"Content-Type" "application/json"}
+   {}
+   (json-str {"source"  (str (normalize-url src-server) src-database)
+	      "target" target-database})))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;         Documents           ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -201,16 +210,23 @@
                                     (url-encode (as-str id)) "?rev=" rev)))))))
 
 (defn #^{:rebind true} document-delete
-  [server database id]
-  (if-not (empty? id)
-    (when-let [database (validate-dbname database)]
-      (let [id (do-get-doc database id)
-            rev (do-get-rev (normalize-url (normalize-url server)) database id)]
-        (couch-request (str (normalize-url server) database "/"
-                            (url-encode (as-str id)) "?rev=" rev)
-                       :delete)
-        true))
-    false))
+  ([server database id rev]
+     (if-not (empty? id)
+	(when-let [database (validate-dbname database)]
+	  (let [id (do-get-doc database id)]
+	    (couch-request (str (normalize-url server) database "/"
+				(url-encode (as-str id)) "?rev=" rev)
+			   :delete)
+	    true))
+	false))
+  ([server database id]
+      (if-not (empty? id)
+	(when-let [database (validate-dbname database)]
+	  (let [id (do-get-doc database id)]
+	    (document-delete server database id
+			     (do-get-rev (normalize-url server)
+					 database id))))
+	false)))
 
 (defn #^{:rebind true} document-bulk-update
   "Does a bulk-update to couchdb, accoding to
@@ -246,6 +262,34 @@ http://wiki.apache.org/couchdb/HTTP_Bulk_Document_API"
                           (sorted-map-by revision-comparator (:rev m) (:status m)))
                         (:_revs_info (:json (couch-request (str (normalize-url server) database "/" (url-encode (as-str id)) "?revs_info=true")))))))))
 
+(defn- url-encode-str [s]
+  (-> s
+      as-str
+      url-encode))
+
+(defn #^{:rebind true} document-get-conflicts
+  "Returns a list of document revisions that conflict with the doc id"
+  [server database id]
+  (when-let [database (validate-dbname database)]
+    (-> server
+	normalize-url
+	(str database "/"
+	     (url-encode-str (do-get-doc database id)) "?conflicts=true")
+	couch-request
+	:json
+	:_conflicts)))
+
+(defn #^{:rebind true} document-resolve-conflict
+  "Function for resolving a conflicted document takes a server,
+   database, document id, conflict revision (see document-get-conflicts)
+   and a function that takes two args, the first conflicted doc, the second
+   the current doc"
+  [server database id conflict-rev resolve-fn]
+  (when-let [database (validate-dbname database)]
+    (let [merged-doc (resolve-fn (document-get server database id conflict-rev)
+				 (document-get server database id))]
+      (document-update server database id merged-doc)
+      (document-delete server database id conflict-rev))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;            Views            ;;

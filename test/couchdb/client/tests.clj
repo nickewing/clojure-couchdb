@@ -9,6 +9,8 @@
 
 (def +test-server+ "http://localhost:5984/")
 (def +test-db+ "clojure-couchdb-test-database")
+(def +test-db2+  "clojure-couchdb-test-database2")
+(def +test-db3+  "clojure-couchdb-test-database3")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;         Utilities           ;;
@@ -298,6 +300,110 @@
   ;; try to delete an attachment that doesn't exist
   (is (= true (couchdb/attachment-delete +test-server+ +test-db+ "bam" "f"))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Conflict/Replication Testing
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn test-db-fixture [db f]
+     (try
+       (couchdb/database-create +test-server+ db)
+       (f)
+       (finally
+	(couchdb/database-delete +test-server+ db))))
+
+(def test-db2-fixture (partial test-db-fixture +test-db2+))
+(def test-db3-fixture (partial test-db-fixture +test-db3+))
+(def test-db2-db3-fixture (compose-fixtures test-db2-fixture test-db3-fixture))
+
+(def document-list* (partial couchdb/document-list +test-server+))
+(def document-create* (partial couchdb/document-create +test-server+))
+(def document-get-conflicts* (partial couchdb/document-get-conflicts +test-server+))
+(def database-replicate* #(couchdb/database-replicate +test-server+ %1 +test-server+ %2))
+
+(deftest replication-test
+  (database-replicate* +test-db+  +test-db2+)
+  (is (= (document-list* +test-db+)
+	 (document-list* +test-db2+))))
+
+(deftest single-conflict-test
+  (let [doc1 (document-create* +test-db+ "conflict" {:foo 1})
+	doc2 (document-create* +test-db2+ "conflict" {:bar 1})] 
+
+    (database-replicate* +test-db+ +test-db2+)
+    (let [conflicts (document-get-conflicts* +test-db2+ "conflict")]
+      (is (= 1 (count conflicts)))
+      (is (= (:_rev doc2) (first conflicts))))))
+
+(deftest multiple-conflict-test
+  (let [doc1 (document-create* +test-db+ "conflict2" {:foo 1})
+	doc2 (document-create* +test-db2+ "conflict2" {:bar 1})
+	doc3 (couchdb/document-update +test-server+ +test-db3+ "conflict2" {:baz 1})]
+
+    (database-replicate* +test-db+ +test-db3+)
+    (database-replicate* +test-db2+ +test-db3+)
+
+    (let [conflicts
+	  (document-get-conflicts* +test-db3+ "conflict2")]
+      (is (= 2 (count conflicts)))
+      (is (= (:_rev doc3) (first conflicts)))
+      (is (= (:_rev doc2) (second conflicts))))))
+
+(deftest no-conflict-test
+  (document-create* +test-db+ "no-conflict4" {:foo 1})
+  (document-create* +test-db2+ "no-conflict5" {:fo 1})
+  (database-replicate* +test-db+ +test-db2+)
+  (let [conflicts1
+	  (document-get-conflicts* +test-db2+ "no-conflict4")
+	conflicts2
+	  (document-get-conflicts* +test-db2+ "no-conflict5")]
+      (is (zero? (count conflicts1)))
+      (is (zero? (count conflicts2)))))
+
+(deftest single-conflict-resolve-test
+  (let [doc1 (document-create* +test-db+ "conflict6" {:foo 1})
+	doc2 (document-create* +test-db2+ "conflict6" {:bar 1})] 
+
+    (database-replicate* +test-db+ +test-db2+)
+    (let [conflicts (document-get-conflicts* +test-db2+ "conflict6")]
+      (is (= 1 (count conflicts)))
+      (is (= (:_rev doc2) (first conflicts)))
+      (couchdb/document-resolve-conflict +test-server+ +test-db2+ "conflict6"
+					 (first conflicts) merge)
+      (let [conflicts (document-get-conflicts* +test-db2+ "conflict6")
+	    merged-doc (couchdb/document-get +test-server+ +test-db2+ "conflict6")]
+
+	(is (zero? (count conflicts)))
+	(is (= 1 (:foo merged-doc)))
+	(is (= 1 (:bar merged-doc)))))))
+
+(deftest multiple-conflict-resolve-test
+  (let [doc1 (document-create* +test-db+ "conflict7" {:foo 1})
+	doc2 (document-create* +test-db2+ "conflict7" {:bar 1})
+	doc3 (couchdb/document-update +test-server+ +test-db3+ "conflict7" {:baz 1})]
+
+    (database-replicate* +test-db+ +test-db3+)
+    (database-replicate* +test-db2+ +test-db3+)
+
+    (let [conflicts (document-get-conflicts* +test-db3+ "conflict7")]
+      
+      (is (= 2 (count conflicts)))
+      (is (= (:_rev doc3) (first conflicts)))
+      (is (= (:_rev doc2) (second conflicts)))
+
+      (couchdb/document-resolve-conflict +test-server+ +test-db3+ "conflict7"
+					 (first conflicts) merge)
+      (let [merged-doc (couchdb/document-get +test-server+ +test-db3+ "conflict7")
+	    conflicts-after-merge (document-get-conflicts* +test-db3+ "conflict7")]
+
+	(is (= 1 (count conflicts-after-merge)))
+	(is (= (second conflicts)
+	       (first conflicts-after-merge)))
+	(is (= 1 (:foo merged-doc)))
+	(is (= 1 (:baz merged-doc)))
+	(is (nil? (:bar merged-doc)))))))
+
 ;;; test-ns-hook is used to run tests in the specified order
 (defn test-ns-hook []
   (databases)
@@ -305,6 +411,11 @@
   (attachments)
   (documents-passing-map)
   (attachments-passing-map)
+  (test-db2-fixture replication-test)
+  (test-db2-fixture single-conflict-test)
+  (test-db2-db3-fixture multiple-conflict-test)
+  (test-db2-fixture single-conflict-resolve-test)
+  (test-db2-db3-fixture multiple-conflict-resolve-test)
   (cleanup)
   (error-checking)
   (cleanup))
